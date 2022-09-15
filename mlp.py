@@ -66,14 +66,15 @@ class NeuralNetwork(nn.Module):
     
     def forward(self, x):
         x=self.flatten(x)
-        logits=self.linear_relu_stack(x)
-        return logits
+        logits=self.linear_relu_stack(x) #passing into network 
+        return logits #returning output 
 model=torch.load('model.pth')
 # model=NeuralNetwork()
 
 learningRate=1e-3
 batchSize=64
-epochs=10
+epochs=0
+
 
 loss_fn=nn.CrossEntropyLoss()
 optimizer=torch.optim.SGD(model.parameters(), lr=learningRate)
@@ -81,15 +82,15 @@ optimizer=torch.optim.SGD(model.parameters(), lr=learningRate)
 
 def trainLoop(dataloader, model, loss_fn, optimizer):
     size=len(dataloader.dataset)
-    for batch, (X, y) in enumerate(dataloader):
+    for batch, (X, y) in enumerate(dataloader): #keep track of the iterable batch number 
         pred=model(X)
         loss=loss_fn(pred, y)
         
         optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        loss.backward() #propogate back
+        optimizer.step() #make our step 
         
-        if batch % 100==0:
+        if batch % 100==0: #this would be our dataset number 
             loss, current=loss.item(), batch*len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -97,12 +98,13 @@ def test_loop(dataloader, model, loss_fn):
     size=len(dataloader.dataset)
     num_batches=len(dataloader)
     test_loss, correct=0,0
-    
     with torch.no_grad():
         for X,y in dataloader:
             pred=model(X)
             test_loss+=loss_fn(pred, y).item()
             correct+=(pred.argmax(1)==y).type(torch.float).sum().item()
+            
+ 
         
     test_loss/=num_batches
     correct/=size
@@ -115,4 +117,27 @@ for t in range(epochs):
     test_loop(test_dataloader, model, loss_fn)
 print("Done!")
 
+
+#this will calculate as a whole 
+jac=torch.autograd.functional.jacobian(model, testData[1][0])
+
+jacbycolumn=[]
+
+for i in range(0, len(testData[1][0][0])):
+    pixels=testData[1][0][0][i] #this is our pixel tensor (row)
+    darkinp=torch.zeros(0) #declare a zero row 
+    for j in range(0, i):
+        zeroed=torch.zeros(28)
+        darkinp=torch.cat((darkinp,zeroed),0)
+    
+    darkinp=torch.cat((darkinp, pixels), 0)
+    
+    for k in range(i+1, len(testData[1][0][0])):
+        zeroed=torch.zeros(28)
+        darkinp=torch.cat((darkinp,zeroed),0)
+    
+    # print(darkinp.view(28,28))
+    jacbycolumn.append(torch.autograd.functional.jacobian(model, darkinp.resize(1,784)))
+
+print(len(jacbycolumn))
 torch.save(model, 'model.pth')
