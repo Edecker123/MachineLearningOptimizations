@@ -8,9 +8,9 @@ import numpy as np
 import os 
 from torch import nn 
 import torchvision as models
-
+import time
 import functorch
-from functorch import jacrev,vjp,vmap
+from functorch import jacrev,vjp,vmap,jacfwd
 
 trainingData=datasets.FashionMNIST( #here we create a dataset that is iterable 
     root="data", 
@@ -119,15 +119,44 @@ print("Done!")
 
 
 #this will calculate as a whole
-
-for batch, (X, y) in enumerate(train_dataloader): #keep track of the iterable batch number 
+print("jacrev", "jacfwd", "autograd", "vjp")
+for batch, (X, y) in enumerate(train_dataloader): #keep track of the iterable batch number
+    
+    # jac2=vmap(torch.autograd.functional.jacobian(model,X,vectorize=True, strategy='forward-mode'))(X)
+    # print(jac2.shape)
+    start=time.time() 
     jacobian=vmap(jacrev(model))(X)
-    t1=jacobian[0][0][0]
+    end=time.time()
+    delta1=end-start
+ 
     
-    ja=torch.autograd.functional.jacobian(model, X)
-    
-    t2=ja[0][0][0][0]
-    print(t2)
-    assert torch.allclose(t1, t2)
+    start=time.time()
+    jacobian=vmap(jacfwd(model))(X)
+    end=time.time()
+    delta2=end-start
 
-    break
+    start=time.time()
+    jaclist=[]
+    for i in range(0, len(X)):
+        j=torch.autograd.functional.jacobian(model, X[i])
+        jaclist.append(j)
+    
+    jaclist=tuple(jaclist)
+    torch.stack(jaclist)
+    end=time.time()
+    
+    
+    delta3=end-start
+    
+    start=time.time()
+    jvpprod=vjp(model,X) #64X10
+    end=time.time()
+    delta4=end-start
+    
+    print(delta1, delta2 , delta3 , delta4)
+    
+    # t2=ja[0][0][0][0] 
+    
+    # assert torch.allclose(t1, t2)
+
+    
