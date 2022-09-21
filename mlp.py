@@ -8,9 +8,9 @@ import numpy as np
 import os 
 from torch import nn 
 import torchvision as models
-import time
 
-
+import functorch
+from functorch import jacrev,vjp,vmap
 
 trainingData=datasets.FashionMNIST( #here we create a dataset that is iterable 
     root="data", 
@@ -60,36 +60,37 @@ class NeuralNetwork(nn.Module):
             nn.Linear(28*28, 512), #this applies a linear transformation on the vectors with the indices as weights and biasses
             nn.ReLU(), #this is our activation
             nn.Linear(512, 512),
-            # nn.ReLU(),   
-            # nn.Linear(512, 10),
+            nn.ReLU(),   
+            nn.Linear(512, 10),
         )
     
     def forward(self, x):
         x=self.flatten(x)
-        logits=self.linear_relu_stack(x)
-        return logits
-# model=torch.load('model.pth')
-model=NeuralNetwork()
+        logits=self.linear_relu_stack(x) #passing into network 
+        return logits #returning output 
+model=torch.load('model.pth')
+# model=NeuralNetwork()
 
 learningRate=1e-3
 batchSize=64
 epochs=0
 
-loss_fn=nn.CrossEntropyLoss() #a mix of MSE and neglog
-optimizer=torch.optim.SGD(model.parameters(), lr=learningRate) #optimizing the parameters using stochastic gradient decent that are in the nn 
+
+loss_fn=nn.CrossEntropyLoss()
+optimizer=torch.optim.SGD(model.parameters(), lr=learningRate)
 
 
 def trainLoop(dataloader, model, loss_fn, optimizer):
-    size=len(dataloader.dataset) #this is the length o f the iterable dataset
-    for batch, (X, y) in enumerate(dataloader): #iterate through the input and proper output pairs in our batch 
-        pred=model(X) #make a prediction then calculate how wrong we were
-        loss=loss_fn(pred, y) #predicting loss
+    size=len(dataloader.dataset)
+    for batch, (X, y) in enumerate(dataloader): #keep track of the iterable batch number 
+        pred=model(X)
+        loss=loss_fn(pred, y)
         
-        optimizer.zero_grad() 
-        loss.backward()
-        optimizer.step() #make a step 
+        optimizer.zero_grad()
+        loss.backward() #propogate back
+        optimizer.step() #make our step 
         
-        if batch % 100==0:
+        if batch % 100==0: #this would be our dataset number 
             loss, current=loss.item(), batch*len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -97,12 +98,13 @@ def test_loop(dataloader, model, loss_fn):
     size=len(dataloader.dataset)
     num_batches=len(dataloader)
     test_loss, correct=0,0
-    
     with torch.no_grad():
         for X,y in dataloader:
             pred=model(X)
             test_loss+=loss_fn(pred, y).item()
             correct+=(pred.argmax(1)==y).type(torch.float).sum().item()
+            
+ 
         
     test_loss/=num_batches
     correct/=size
@@ -115,14 +117,17 @@ for t in range(epochs):
     test_loop(test_dataloader, model, loss_fn)
 print("Done!")
 
-start=time.time()
-jaclist=[]
-for batch, (X, y) in enumerate(train_dataloader): 
-    # for i in range(0, 64):
-        # j=torch.autograd.functional.jacobian(model, X[i])
-        # jaclist.append(j)
-    j=torch.autograd.functional.jacobian(model, X)
+
+#this will calculate as a whole
+
+for batch, (X, y) in enumerate(train_dataloader): #keep track of the iterable batch number 
+    jacobian=vmap(jacrev(model))(X)
+    t1=jacobian[0][0][0]
+    
+    ja=torch.autograd.functional.jacobian(model, X)
+    
+    t2=ja[0][0][0][0]
+    print(t2)
+    assert torch.allclose(t1, t2)
+
     break
-end=time.time()
-print(end-start)
-torch.save(model, 'model.pth')
