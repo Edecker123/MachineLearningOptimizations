@@ -8,7 +8,7 @@ import numpy as np
 import os 
 from torch import nn 
 import torchvision as models
-
+import time
 
 
 
@@ -60,34 +60,34 @@ class NeuralNetwork(nn.Module):
             nn.Linear(28*28, 512), #this applies a linear transformation on the vectors with the indices as weights and biasses
             nn.ReLU(), #this is our activation
             nn.Linear(512, 512),
-            nn.ReLU(),   
-            nn.Linear(512, 10),
+            # nn.ReLU(),   
+            # nn.Linear(512, 10),
         )
     
     def forward(self, x):
         x=self.flatten(x)
         logits=self.linear_relu_stack(x)
         return logits
-model=torch.load('model.pth')
-# model=NeuralNetwork()
+# model=torch.load('model.pth')
+model=NeuralNetwork()
 
 learningRate=1e-3
 batchSize=64
-epochs=10
+epochs=0
 
-loss_fn=nn.CrossEntropyLoss()
-optimizer=torch.optim.SGD(model.parameters(), lr=learningRate)
+loss_fn=nn.CrossEntropyLoss() #a mix of MSE and neglog
+optimizer=torch.optim.SGD(model.parameters(), lr=learningRate) #optimizing the parameters using stochastic gradient decent that are in the nn 
 
 
 def trainLoop(dataloader, model, loss_fn, optimizer):
-    size=len(dataloader.dataset)
-    for batch, (X, y) in enumerate(dataloader):
-        pred=model(X)
-        loss=loss_fn(pred, y)
+    size=len(dataloader.dataset) #this is the length o f the iterable dataset
+    for batch, (X, y) in enumerate(dataloader): #iterate through the input and proper output pairs in our batch 
+        pred=model(X) #make a prediction then calculate how wrong we were
+        loss=loss_fn(pred, y) #predicting loss
         
-        optimizer.zero_grad()
+        optimizer.zero_grad() 
         loss.backward()
-        optimizer.step()
+        optimizer.step() #make a step 
         
         if batch % 100==0:
             loss, current=loss.item(), batch*len(X)
@@ -115,4 +115,14 @@ for t in range(epochs):
     test_loop(test_dataloader, model, loss_fn)
 print("Done!")
 
+start=time.time()
+jaclist=[]
+for batch, (X, y) in enumerate(train_dataloader): 
+    # for i in range(0, 64):
+        # j=torch.autograd.functional.jacobian(model, X[i])
+        # jaclist.append(j)
+    j=torch.autograd.functional.jacobian(model, X)
+    break
+end=time.time()
+print(end-start)
 torch.save(model, 'model.pth')
