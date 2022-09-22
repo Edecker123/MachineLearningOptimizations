@@ -117,6 +117,9 @@ for t in range(epochs):
     test_loop(test_dataloader, model, loss_fn)
 print("Done!")
 
+def calc(ine):
+    return torch.autograd.functional.jacobian(model,ine)
+
 
 #this will calculate as a whole
 print("jacrev", "jacfwd", "autograd", "vjp")
@@ -128,7 +131,13 @@ for batch, (X, y) in enumerate(train_dataloader): #keep track of the iterable ba
     jacobian=vmap(jacrev(model))(X)
     end=time.time()
     delta1=end-start
- 
+    
+    # start=time.time() #autograd does not like vmap
+    # print(1)
+    # jad=vmap(calc)
+    # X.requires_grad_(True)
+    # print(jad(X))
+    # end=time.time()
     
     start=time.time()
     jacobian=vmap(jacfwd(model))(X)
